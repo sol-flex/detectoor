@@ -1,0 +1,71 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<link rel="stylesheet" href="styles.css">
+<meta charset="UTF-8">
+<title>Embedded Style Sheet</title>
+<style>
+ 
+</style>
+</head>
+<body>
+  <h1>Wash Trading Detectoooor</h1>
+  <form action="/action_page.php">
+    <label for="collection" id="collection_symbol_text">Collection Symbol:</label>
+    <input type="text" id="collection" name="collection"><br><br>
+    <input id="submit_button" type="submit" value="Submit">
+  </form>
+  <div id="output">
+    <h2>Wallets wash trading: </h2>
+  </div>
+  <div id="output_2">
+    <h2>Wallets funded by creator wallet: </h2>
+  </div>
+</body>
+<script type="text/javascript" src="testshit.js">
+
+</script>
+
+<script type="text/javascript">
+  
+const element = document.getElementById("submit_button");
+element.addEventListener("click", myFunction);
+
+function myFunction(event) {
+  event.preventDefault()
+
+  var collection_symbol= document.getElementById("collection").value;
+
+  console.log(collection_symbol)
+  var url = `http://localhost:3000/start2/${collection_symbol}`
+
+  console.log(url)
+
+  fetch(url).then(function (response) {
+  
+  return response.json();
+}).then(function (data) {
+
+  for (const property in data.washTradingWallets) {
+    const paragraph = document.createElement("p");
+    paragraph.innerHTML = `Wallet 1: ${property} - Wallet 2: ${data.washTradingWallets[property]}`
+    document.getElementById("output").appendChild(paragraph)
+
+  }
+
+    for (const property in data.walletsFundedByCreator) {
+      const paragraph = document.createElement("p");
+      paragraph.innerHTML = `Wallet: ${property}`
+      document.getElementById("output_2").appendChild(paragraph)
+
+  }
+  
+  console.log(data);
+}).catch(function (err) {
+  // There was an error
+  console.warn('Something went wrong.', err);
+});
+
+}
+</script>
+</html>

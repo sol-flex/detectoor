@@ -1,0 +1,20 @@
+body {
+  background-color: black;
+}
+h1, h2 {
+  color: white;
+}
+p {
+  color: white;
+}
+#submit_button {
+  background-color:  #E42575;
+  border-style: solid;
+  border-color: #E42575;
+  color:  white;
+  border-radius:  0.375rem;
+}
+
+#collection_symbol_text {
+  color:  white;
+}
