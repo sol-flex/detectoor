@@ -7,7 +7,7 @@ const Connection = Solana.Connection
 const clusterApiUrl = Solana.clusterApiUrl
 const connection = new Connection(clusterApiUrl("mainnet-beta"));
 const metaplex = new Metaplex.Metaplex(connection);
-
+const PORT = process.env.PORT || 5000
 
 
 // start("grifons", "KeZc1o6X5ACdHXWFyVYP6XVtRBhCcczXPKxSCXm7ocS")
@@ -36,7 +36,7 @@ app.get('/start2/:collectionSymbol', async (req, res) => {
   res.send(body);
 });
 
-app.listen(3000, () => console.log('Example app is listening on port 3000.'));
+app.listen(PORT, () => console.log(`Example app is listening on port ${PORT}.`));
 
 const getCollectionBuyTxns = async (collection_symbol) => {
   
