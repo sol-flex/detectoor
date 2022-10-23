@@ -9,17 +9,17 @@
 </style>
 </head>
 <body>
-  <h1>Wash Trading Detectoooor</h1>
+  <h1>Detectoooor</h1>
   <form action="/action_page.php">
     <label for="collection" id="collection_symbol_text">Collection Symbol:</label>
     <input type="text" id="collection" name="collection"><br><br>
     <input id="submit_button" type="submit" value="Submit">
   </form>
   <div id="output">
-    <h2>Wallets wash trading: </h2>
+    <h2>Wallets that bought/sold between eachother atleast once: </h2>
   </div>
   <div id="output_2">
-    <h2>Wallets funded by creator wallet: </h2>
+    <h2>Wallets buying that were funded by creator wallet: </h2>
   </div>
 </body>
 <script type="text/javascript" src="testshit.js">
@@ -37,7 +37,7 @@ function myFunction(event) {
   var collection_symbol= document.getElementById("collection").value;
 
   console.log(collection_symbol)
-  var url = `http://localhost:3000/start2/${collection_symbol}`
+  var url = `http://localhost:5000/start2/${collection_symbol}`
 
   console.log(url)
 

@@ -20,20 +20,29 @@ app.use(cors({
 }));
 
 app.get('/', (req, res) => {
-  res.send("yooo")
+  try {
+      res.send("Detectooor server running")
+  } catch(err) {
+    res.status(500).json({ message: "Error in invocation of API: /" })
+  }
 
 });
 
 app.get('/start2/:collectionSymbol', async (req, res) => {
-  console.log(req.params)
+  try {
+    console.log(req.params)
 
-  var body = {}
+    var body = {}
 
-  body.washTradingWallets = await start2(req.params.collectionSymbol);
-  body.walletsFundedByCreator = await start(req.params.collectionSymbol);
+    body.washTradingWallets = await start2(req.params.collectionSymbol);
+    body.walletsFundedByCreator = await start(req.params.collectionSymbol);
 
-  console.log("body", body)
-  res.send(body);
+    console.log("body", body)
+    res.send(body);
+
+  } catch(err) {
+    res.status(500).json({ message: "Error in invocation of API: /start2" })
+  }
 });
 
 app.listen(PORT, () => console.log(`Example app is listening on port ${PORT}.`));
