@@ -264,7 +264,89 @@ const getCreatorWallets = async () => {
   return creatorWallets;
 }
 
-getCreatorWallets();
+const findCommonFundingSources = async (wallets) => {
+
+  let solTransfers = {}
+
+  try {
+
+    for (let i = 0; i < wallets.length; i++) {
+
+      let offset = 0;
+      let limit = 100;
+      let data_length = 100;
+      let walletsToAdd = {};
+      let max_pages = 7;
+      let page = 0;
+
+      //&& page != max_pages <- add this into the condition below if running into timeouts 
+
+      while(data_length == limit && page != max_pages) {
+        const response = await axios({
+          method: "get",
+          url: `https://public-api.solscan.io/account/solTransfers?account=${wallets[i]}&limit=${limit}&offset=${offset}`
+        });
+
+        data_length = response.data.data.length
+
+        console.log(`[${i}]: ${wallets[i]}`, response.data.data.length)
+
+        response.data.data.forEach(element => {
+          if(element.src != wallets[i] && !(element.src in walletsToAdd)) {
+            walletsToAdd[element.src] = wallets[i];
+          }
+        })
+
+        offset = offset + 100;
+        page++;
+     }
+
+     console.log(`${wallets[i]}: `, walletsToAdd);
+
+      for (const wallet in walletsToAdd) {
+        if(wallet in solTransfers) {
+          solTransfers[wallet].count++;
+          solTransfers[wallet].wallets_funded.push(walletsToAdd[wallet])
+        } else {
+          solTransfers[wallet] = { count: 1, wallets_funded: [walletsToAdd[wallet]] }
+        }
+      }
+
+      walletsToAdd = {};
+      offset = 0;
+
+
+    }
+
+    console.log(`Wallets funding buyers: `, solTransfers);
+
+  } catch(err) {
+    console.log(err);
+  }
+
+}
+
+const washywashy = async () => {
+  var wallets = await getCollectionBuyTxns("sol_city_gen_2");
+  console.log(Object.keys(wallets).length)
+  findCommonFundingSources(Object.keys(wallets));
+}
+
+washywashy();
+
+const getNFT = async () => {
+
+const mintAddress = new Solana.PublicKey("FULsjDzKCyb83jERvzDbtJLo55ynckTtvgsBZpShNdEQ");
+
+const nft = await metaplex.nfts().findByMint({ mintAddress });
+
+console.log(nft)
+
+console.log(nft.mint.freezeAuthorityAddress.toBase58());
+
+}
+
+// getNFT();
 
 
 

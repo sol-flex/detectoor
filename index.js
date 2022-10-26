@@ -133,30 +133,57 @@ const getWallet2WalletTxs = async (collection_symbol) => {
   
   var wash_trading_wallets = {};
   var buyNow_txns = [];
+  let offset = 0
+  let limit = 1000
+  var data_length = 1000;
 
   try {
 
-    const response = await axios({
-      method: "get",
-      url: `https://api-mainnet.magiceden.dev/v2/collections/${collection_symbol}/activities?offset=0&limit=1000`
-    });
-    console.log(response.data[0].type)
+    while(data_length == limit) {
+      const response = await axios({
+        method: "get",
+        url: `https://api-mainnet.magiceden.dev/v2/collections/${collection_symbol}/activities?offset=${offset}&limit=${limit}`
+      });
 
-    response.data.forEach(element => {
-      if(element.type === "buyNow") {
-        buyNow_txns.push(element);
-      }
-    })
+      response.data.forEach(element => {
+        if(element.type === "buyNow") {
+          buyNow_txns.push(element);
+        }
+      })
+      console.log(response.data[0])
+      console.log(response.data.length)
+      data_length = response.data.length
+
+      offset = offset + 100;
+
+    }
 
     buyNow_txns.forEach(element => {
       buyNow_txns.forEach(element_1 => {
         if(element.buyer === element_1.seller && element.seller === element_1.buyer) {
           if(!(element.buyer in wash_trading_wallets)) {
-            wash_trading_wallets[element.buyer] = element.seller
+            wash_trading_wallets[element.buyer] = {}
+            wash_trading_wallets[element.buyer].wallet_2 = element.seller
+            wash_trading_wallets[element.buyer].vol = 0;
+            wash_trading_wallets[element.buyer].txns = 0;
           }
         }
       })
     });
+
+    for (const wallet in wash_trading_wallets) {
+
+      console.log(wallet)
+      console.log(wash_trading_wallets)
+
+      buyNow_txns.forEach(element => {
+        if(element.buyer == wallet && element.seller == wash_trading_wallets[wallet].wallet_2) {
+          console.log(wash_trading_wallets[wallet])
+          wash_trading_wallets[wallet].vol = wash_trading_wallets[wallet].vol + element.price
+          wash_trading_wallets[wallet].txns++
+        }
+      })
+    }
 
     console.log(wash_trading_wallets);
 
@@ -226,6 +253,6 @@ const start2 = async (collection_symbol) => {
 
 }
 
-start("grifons")
+// start2("travelling_cats")
 
 

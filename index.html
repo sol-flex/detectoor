@@ -2,6 +2,7 @@
 <html>
 <head>
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
 <meta charset="UTF-8">
 <title>Embedded Style Sheet</title>
 <style>
@@ -13,10 +14,20 @@
   <form action="/action_page.php">
     <label for="collection" id="collection_symbol_text">Collection Symbol:</label>
     <input type="text" id="collection" name="collection"><br><br>
-    <input id="submit_button" type="submit" value="Submit">
+    <button id="submit_button">
+      Submit <i id="loading_wheel"></i>
+    </button>
   </form>
   <div id="output">
     <h2>Wallets that bought/sold between eachother atleast once: </h2>
+    <table id="wash_trading_table">
+      <tr>
+        <th>Volume</th>
+        <th>Txns</th>
+        <th>Buying wallet</th>
+        <th>Selling wallet</th>
+      </tr>
+    </table>
   </div>
   <div id="output_2">
     <h2>Wallets buying that were funded by creator wallet: </h2>
@@ -34,28 +45,74 @@ element.addEventListener("click", myFunction);
 function myFunction(event) {
   event.preventDefault()
 
+  const output = document.querySelectorAll('.output');
+
+  output.forEach(element => {
+    element.remove();
+  });
+
   var collection_symbol= document.getElementById("collection").value;
 
   console.log(collection_symbol)
-  var url = `http://localhost:5000/start2/${collection_symbol}`
+  var url = `https://detectooor.herokuapp.com/start2/${collection_symbol}`
 
   console.log(url)
+
+  var element = document.getElementById("loading_wheel");
+  element.className = "fa fa-spinner fa-spin";
 
   fetch(url).then(function (response) {
   
   return response.json();
 }).then(function (data) {
 
+  var element = document.getElementById("loading_wheel");
+  element.className = "";
+
+  console.log(data.washTradingWallets)
+
+  console.log(data.walletsFundedByCreator)
+
   for (const property in data.washTradingWallets) {
-    const paragraph = document.createElement("p");
-    paragraph.innerHTML = `Wallet 1: ${property} - Wallet 2: ${data.washTradingWallets[property]}`
-    document.getElementById("output").appendChild(paragraph)
+    const row = document.createElement("tr");
+    row.className = "output"
+    let td_vol = document.createElement("td")
+    let td_txns = document.createElement("td")
+    let td_wal_1 = document.createElement("td")
+    let td_wal_2 = document.createElement("td")
+    let wal_1_link = document.createElement("a")
+    let wal_2_link = document.createElement("a")
+
+    wal_1_link.href = `https://magiceden.io/u/${property}`
+    wal_2_link.href = `https://magiceden.io/u/${data.washTradingWallets[property].wallet_2}`
+    wal_1_link.target = "_blank"
+    wal_2_link.target = "_blank"
+
+    td_vol.innerHTML = `${data.washTradingWallets[property].vol}`
+    td_txns.innerHTML = `${data.washTradingWallets[property].txns}`
+    wal_1_link.innerHTML = `${property}`
+    wal_2_link.innerHTML = `${data.washTradingWallets[property].wallet_2}`
+
+    td_wal_1.appendChild(wal_1_link)
+    td_wal_2.appendChild(wal_2_link)
+
+    row.appendChild(td_vol);
+    row.appendChild(td_txns);
+    row.appendChild(td_wal_1);
+    row.appendChild(td_wal_2);
+
+    // <a href="url">link text</a>
+    // target="_blank"
+
+
+    document.getElementById("wash_trading_table").appendChild(row)
 
   }
 
     for (const property in data.walletsFundedByCreator) {
       const paragraph = document.createElement("p");
-      paragraph.innerHTML = `Wallet: ${property}`
+      paragraph.className = "output"
+      paragraph.innerHTML = `${property}`
       document.getElementById("output_2").appendChild(paragraph)
 
   }
@@ -64,6 +121,10 @@ function myFunction(event) {
 }).catch(function (err) {
   // There was an error
   console.warn('Something went wrong.', err);
+
+  var element = document.getElementById("loading_wheel");
+  element.className = "";
+
 });
 
 }

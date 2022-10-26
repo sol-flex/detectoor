@@ -18,3 +18,26 @@ p {
 #collection_symbol_text {
   color:  white;
 }
+
+table {
+  font-family: arial, sans-serif;
+  border-collapse: collapse;
+  width: 100%;
+  color:  white;
+}
+
+td, th {
+  border: 1px solid #dddddd;
+  text-align: left;
+  padding: 8px;
+  color: white;
+}
+
+tr:nth-child(even) {
+  background-color: #1C1326;
+  color: white;
+}
+
+a {
+  color: white;
+}
