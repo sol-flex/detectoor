@@ -8,6 +8,7 @@ const clusterApiUrl = Solana.clusterApiUrl
 const connection = new Connection(clusterApiUrl("mainnet-beta"));
 const metaplex = new Metaplex.Metaplex(connection);
 const PORT = process.env.PORT || 5000
+const Delay = require("http-delayed-response")
 
 
 // start("grifons", "KeZc1o6X5ACdHXWFyVYP6XVtRBhCcczXPKxSCXm7ocS")
@@ -18,6 +19,7 @@ const app = express();
 app.use(cors({
     origin: '*'
 }));
+
 
 app.get('/', (req, res) => {
   try {
@@ -139,7 +141,7 @@ const getWallet2WalletTxs = async (collection_symbol) => {
 
   try {
 
-    while(data_length == limit) {
+    while(data_length == limit && offset != 16000) {
       const response = await axios({
         method: "get",
         url: `https://api-mainnet.magiceden.dev/v2/collections/${collection_symbol}/activities?offset=${offset}&limit=${limit}`
@@ -154,7 +156,7 @@ const getWallet2WalletTxs = async (collection_symbol) => {
       console.log(response.data.length)
       data_length = response.data.length
 
-      offset = offset + 100;
+      offset = offset + 1000;
 
     }
 
@@ -253,6 +255,50 @@ const start2 = async (collection_symbol) => {
 
 }
 
-// start2("travelling_cats")
+const start3 = async (collection_symbol) => {
+  var matches = {};
+  var solTransferWallets = [];
+  let token_mint_address = ""
+  let creatorWallets = [];
+
+  const response = await axios({
+      method: "get",
+      url: `https://api-mainnet.magiceden.dev/v2/collections/${collection_symbol}/listings?offset=0&limit=20`
+    });
+
+  token_mint_address = response.data[0].tokenMint
+
+  // console.log(token_mint_address)
+
+  creatorWallets = await getCreatorWallets(token_mint_address);
+
+  console.log(creatorWallets);
+
+  for (let i = 0; i < creatorWallets.length; i++) {    
+    let transfers = await getCreatorTransfers(creatorWallets[i]);
+    solTransferWallets = solTransferWallets.concat(transfers)
+  }
+
+  console.log("sol wallet transfers: ", solTransferWallets);
+
+  var walletTally = await getCollectionBuyTxns(collection_symbol);
+
+  console.log("wallet tally :", walletTally);
+
+
+  solTransferWallets.forEach(transfer_recipient => {
+    for (const wallet in walletTally) {
+      if(wallet == transfer_recipient && !(wallet in matches)) {
+        matches[wallet] = true;
+      }
+    }
+  })
+
+  console.log(matches)
+  return matches;
+
+}
+
+// start("smetanas")
 
 

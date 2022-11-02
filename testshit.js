@@ -9,6 +9,10 @@ const clusterApiUrl = Solana.clusterApiUrl
 const connection = new Connection(clusterApiUrl("mainnet-beta"));
 const metaplex = new Metaplex.Metaplex(connection);
 
+const fs = require('fs');
+const csvParser = require('csv-parser');
+
+const filePath = "./dust_city_creator_transfers.csv"
 
 const getCollectionBuyTxns = async (collection_symbol) => {
   
@@ -18,10 +22,10 @@ const getCollectionBuyTxns = async (collection_symbol) => {
 
     const response = await axios({
       method: "get",
-      url: `https://api-mainnet.magiceden.dev/v2/collections/${collection_symbol}/activities?offset=0&limit=1000`
+      url: `https://api-mainnet.magiceden.dev/v2/collections/${collection_symbol}/activities?offset=16000&limit=1000`
     });
 
-    console.log(response.data[0].tokenMint)
+    console.log(response.data.length)
     
     response.data.forEach(element => {
       if (element.type === "buyNow" && element.buyer in wallet_tally) {
@@ -30,6 +34,50 @@ const getCollectionBuyTxns = async (collection_symbol) => {
         wallet_tally[element.buyer] = 1
       } 
     });
+
+    console.log(wallet_tally);
+
+    return wallet_tally;
+
+  
+  } catch (err) {
+    console.log(err);
+  }
+};
+
+const getCollectionBuyTxnsAll = async (collection_symbol) => {
+  
+  var wallet_tally = {}
+  var limit = 1000;
+  var data_length = 1000
+  var offset = 0
+
+
+  try {
+
+    while(data_length == limit && offset != 16000) {
+      const response = await axios({
+        method: "get",
+        headers: {
+          'Authorization': "Bearer c4c1c0a6-a554-4fe6-9d1a-396e553cc4b7"
+        },
+        url: `https://api-mainnet.magiceden.dev/v2/collections/${collection_symbol}/activities?offset=${offset}&limit=1000`
+      });
+      console.log(response.data.length)
+      data_length = response.data.length
+
+      response.data.forEach(element => {
+        if (element.type === "buyNow" && element.buyer in wallet_tally) {
+          wallet_tally[element.buyer]++
+        } else if (element.type === "buyNow" && !(element.buyer in wallet_tally)) {
+          wallet_tally[element.buyer] = 1
+        } 
+      });
+
+      offset = offset + 1000;
+
+    }
+    
 
     console.log(wallet_tally);
 
@@ -97,6 +145,58 @@ const getWallet2WalletTxs = async (collection_symbol) => {
       }
     })
 
+    buyNow_txns.forEach(element => {
+      buyNow_txns.forEach(element_1 => {
+        if(element.buyer === element_1.seller && element.seller === element_1.buyer) {
+          if(!(element.buyer in wash_trading_wallets)) {
+            wash_trading_wallets[element.buyer] = element.seller
+          }
+        }
+      })
+    });
+
+    console.log(wash_trading_wallets);
+
+    return wash_trading_wallets;
+
+  
+  } catch (err) {
+    console.log(err);
+  }
+};
+
+const getWallet2WalletTxsAll = async (collection_symbol) => {
+  
+  var wash_trading_wallets = {};
+  var buyNow_txns = [];
+  var limit = 1000;
+  var data_length = 1000
+  var offset = 0
+
+
+  try {
+
+    while(data_length == limit && offset != 16000) {
+      const response = await axios({
+        method: "get",
+        headers: {
+          'Authorization': "Bearer c4c1c0a6-a554-4fe6-9d1a-396e553cc4b7"
+        },
+        url: `https://api-mainnet.magiceden.dev/v2/collections/${collection_symbol}/activities?offset=${offset}&limit=1000`
+      });
+      console.log(response.data.length)
+      data_length = response.data.length
+
+      response.data.forEach(element => {
+        if(element.type === "buyNow") {
+          buyNow_txns.push(element);
+        }
+      })
+
+      offset = offset + 1000;
+
+    }
+    
     buyNow_txns.forEach(element => {
       buyNow_txns.forEach(element_1 => {
         if(element.buyer === element_1.seller && element.seller === element_1.buyer) {
@@ -243,7 +343,7 @@ const start = async (collection_symbol) => {
 
 const start2 = (collection_symbol) => {
   console.log("yee")
-  getWallet2WalletTxs(collection_symbol)
+  getCollectionBuyTxnsAll(collection_symbol)
 }
 
 // getCreatorTransfers2("secret_skeletons");
@@ -332,7 +432,29 @@ const washywashy = async () => {
   findCommonFundingSources(Object.keys(wallets));
 }
 
-washywashy();
+const getCreatorTransfersFromCSV = async () => {
+  let transferWallets = []
+
+  fs.createReadStream(filePath)
+      .on('error', () => {
+          console.log("Error");
+      })
+
+      .pipe(csvParser())
+      .on('data', (row) => {
+
+        transferWallets.push(row["                        SolTransfer Destination"])
+
+      })
+
+      .on('end', () => {
+        console.log("file finished reading")
+        console.log(transferWallets.length)
+        return transferWallets;
+      })
+  }
+
+// washywashy();
 
 const getNFT = async () => {
 
@@ -348,7 +470,52 @@ console.log(nft.mint.freezeAuthorityAddress.toBase58());
 
 // getNFT();
 
+//getCreatorTransfersFromCSV();
 
+const start3 = async (collection_symbol) => {
+  var matches = {};
+  var solTransferWallets = [];
+  let token_mint_address = ""
+  let creatorWallets = [];
 
+  let transferWallets = []
 
+  fs.createReadStream(filePath)
+      .on('error', () => {
+          console.log("Error");
+      })
+
+      .pipe(csvParser())
+      .on('data', (row) => {
+
+        transferWallets.push(row["                        SolTransfer Destination"])
+
+      })
+
+      .on('end', async () => {
+        console.log("file finished reading")
+        console.log(transferWallets.length)
+        
+        solTransferWallets = transferWallets;
+        console.log(solTransferWallets)
+
+        var walletTally = await getCollectionBuyTxnsAll(collection_symbol);
+        console.log("wallet tally :", walletTally);
+
+        solTransferWallets.forEach(transfer_recipient => {
+          for (const wallet in walletTally) {
+            if(wallet == transfer_recipient && !(wallet in matches)) {
+              matches[wallet] = true;
+            }
+          }
+        })
+
+        console.log(matches)
+        return matches;
+
+      })
+
+}
+
+getWallet2WalletTxsAll("dustcity")
 
