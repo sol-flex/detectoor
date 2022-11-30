@@ -517,5 +517,101 @@ const start3 = async (collection_symbol) => {
 
 }
 
-getWallet2WalletTxsAll("dustcity")
+const getPercentNewWallets = async (collection_symbol) => {
+  
+  var wallet_tally = {}
+  let offset = 0
+  let limit = 1000
+  var data_length = 1000;
 
+  try {
+
+    while(data_length == limit && offset != 16000) {
+      const response = await axios({
+        method: "get",
+        url: `https://api-mainnet.magiceden.dev/v2/collections/${collection_symbol}/activities?offset=${offset}&limit=${limit}`
+      });
+
+      response.data.forEach(element => {
+        if (element.type === "buyNow" && element.buyer in wallet_tally) {
+          wallet_tally[element.buyer].numTxns++
+        } else if (element.type === "buyNow" && !(element.buyer in wallet_tally)) {
+          
+          wallet_tally[element.buyer] = { numTxns: 1 }
+        } 
+      });
+
+      console.log(response.data[0])
+      console.log(response.data.length)
+      data_length = response.data.length
+
+      offset = offset + 1000;
+
+    }
+
+    console.log(wallet_tally);
+
+    for (const wallet in wallet_tally) {
+      let walletActivities = await getWalletActivities(wallet)
+      let earliestTxn = walletActivities[walletActivities.length-1].blockTime
+      console.log(walletActivities[walletActivities.length-1])
+      console.log(earliestTxn)
+      console.log(earliestTxn)
+      if(earliestTxn >= Date.now() - 259200) {
+        wallet_tally[wallet].newWallet = true
+        console.log(wallet_tally[wallet])
+      } else {
+        wallet_tally[wallet].newWallet = false
+        console.log(wallet_tally[wallet])
+      }
+    }
+
+    console.log(wallet_tally);
+    return wallet_tally
+
+
+  
+  } catch (err) {
+    console.log(err);
+  }
+};
+
+const getWalletActivities = async (wallet) => {
+
+  let walletActivities = [];
+
+  try {
+    let offset = 0
+    let limit = 500
+    var data_length = 500;
+
+    while(data_length == limit && offset != 15500) {
+      const response = await axios({
+        method: "get",
+        url: `https://api-mainnet.magiceden.dev/v2/wallets/${wallet}/activities?offset=${offset}&limit=500`
+      });
+
+      console.log(response.data[0].blockTime)
+      console.log(response.data.length)
+      data_length = response.data.length
+
+      walletActivities = walletActivities.concat(response.data)
+
+      offset = offset + 500;
+
+    }
+
+    console.log(walletActivities.length)
+    console.log(walletActivities.length-1)
+    return walletActivities;
+
+  } catch(err) {
+    console.log(err);
+  }
+}
+
+console.log(Date.now());
+
+getPercentNewWallets("justbears")
+
+// getWalletActivities("2cTsA8sEz25Bm5vgdKKddKCa4Vs7KycyJGAqZBxcg74n")
