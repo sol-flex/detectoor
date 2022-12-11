@@ -9,9 +9,13 @@ const connection = new Connection(clusterApiUrl("mainnet-beta"));
 const metaplex = new Metaplex.Metaplex(connection);
 const PORT = process.env.PORT || 5000
 const Delay = require("http-delayed-response")
+const { v4: uuidv4 } = require('uuid');
 
 
-// start("grifons", "KeZc1o6X5ACdHXWFyVYP6XVtRBhCcczXPKxSCXm7ocS")
+var AWS = require("aws-sdk");
+AWS.config.update({region: 'us-west-2'});
+
+s3 = new AWS.S3({apiVersion: '2006-03-01'});
 
 
 const app = express();
@@ -26,6 +30,38 @@ app.get('/', (req, res) => {
       res.send("Detectooor server running")
   } catch(err) {
     res.status(500).json({ message: "Error in invocation of API: /" })
+  }
+
+});
+
+app.get('/results/:filePath', async (req, res) => {
+  try {
+    console.log("this end point was hit baby hit it baby")
+    console.log(req.params.filePath)
+    var params = {
+      Bucket: "detectooor", 
+      Key: req.params.filePath
+     };
+  
+     await s3.getObject(params, function(err, data) {
+       if (err) {
+         if(err.code == "NoSuchKey") {
+          res.status(202).send({ msg: "NoSuchKey"})
+          console.log(err, err.stack);
+          // send response that the resource doesn't exist
+         } else {
+          res.status(404).send({ msg: "Something went wrong with accessing s3"})
+         }
+       } 
+       else {
+         var jsonData = JSON.parse(data.Body)
+         console.log(jsonData);
+         res.send(jsonData);
+       }
+     });
+      
+  } catch(err) {
+    res.status(500).json({ message: "Error in invocation of API: /results/" })
   }
 
 });
@@ -51,7 +87,13 @@ app.get('/start3/:collectionSymbol', async (req, res) => {
     console.log(req.params)
 
     var body = {}
-    var temp = await start(req.params.collectionSymbol);
+    var uid = uuidv4();
+
+    startAndSendResultToS3(req.params.collectionSymbol, uid);
+
+    res.location(`/${req.params.collectionSymbol}-${uid}.json`)
+    res.status(202).send({ location: `/${req.params.collectionSymbol}-${uid}.json` });
+/*
     if (temp instanceof Error) {
       console.log("sending error to front-end")
       body[temp.name] = temp.message
@@ -62,7 +104,7 @@ app.get('/start3/:collectionSymbol', async (req, res) => {
       body.walletsFundedByCreator = temp;
       res.send(body);
     }
-
+*/
   } catch(err) {
     res.status(500).json({ message: "Error in invocation of API: /start2" })
   }
@@ -340,6 +382,55 @@ const start3 = async (collection_symbol) => {
 
 }
 
-// start("smetanas")
+const startAndSendResultToS3 = async (collection_symbol, uid) => {
+
+  var temp = await start(collection_symbol);
+
+  var obj = temp;
+
+  var buf = Buffer.from(JSON.stringify(obj));
+
+  var data = {
+      Bucket: 'detectooor',
+      Key: `${collection_symbol}-${uid}.json`,
+      Body: buf,
+      ContentEncoding: 'base64',
+      ContentType: 'application/json',
+  };
+
+  s3.upload(data, function (err, data) {
+      if (err) {
+          console.log(err);
+          console.log('Error uploading data: ', data);
+      } else {
+          console.log('succesfully uploaded!!!');
+      }
+  });  
+}
+
+const retrieveFromS3 = async (fileName) => {
+  var params = {
+    Bucket: "detectooor", 
+    Key: fileName
+   };
+
+   s3.getObject(params, function(err, data) {
+     if (err) {
+       if (err.code == "NoSuchKey")
+       res.send({msg: "NoSuchKey"});
+     } 
+     else {
+       var jsonData = JSON.parse(data.Body)
+       console.log(jsonData);
+       // var jsonData = JSON.parse(data);
+     }
+   });
+}
+
+// startAndSendResultToS3("sakura_cats")
+
+// retrieveFromS3("sakura_cats-blahfuck")
+
+
 
 
