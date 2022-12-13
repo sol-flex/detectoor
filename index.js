@@ -115,29 +115,46 @@ app.listen(PORT, () => console.log(`Example app is listening on port ${PORT}.`))
 const getCollectionBuyTxns = async (collection_symbol) => {
   
   var wallet_tally = {}
+  let offset = 0
+  let limit = 1000
+  var data_length = 1000;
 
   try {
 
-    const response = await axios({
-      method: "get",
-      url: `https://api-mainnet.magiceden.dev/v2/collections/${collection_symbol}/activities?offset=0&limit=1000`
-    });
-    console.log(response.data[0].type)
-    
-    response.data.forEach(element => {
-      if (element.type === "buyNow" && element.buyer in wallet_tally) {
-        wallet_tally[element.buyer]++
-      } else if (element.type === "buyNow" && !(element.buyer in wallet_tally)) {
-        
-        wallet_tally[element.buyer] = 1
-      } 
-    });
+    while(true) {
+      const response = await axios({
+        method: "get",
+        url: `https://api-mainnet.magiceden.dev/v2/collections/${collection_symbol}/activities?offset=${offset}&limit=${limit}`
+      });
+
+      if(response.data.length == 0) { break; }
+
+      response.data.forEach(element => {
+        if (element.type === "buyNow" && element.buyer in wallet_tally) {
+          wallet_tally[element.buyer].txns++;
+          wallet_tally[element.buyer].vol = wallet_tally[element.buyer].vol + element.price
+        } else if (element.type === "buyNow" && !(element.buyer in wallet_tally)) {
+          
+          wallet_tally[element.buyer] = {
+            txns: 1,
+            vol: element.price
+          }
+        } 
+      });
+
+      console.log(response.data[0])
+      console.log(response.data.length)
+      data_length = response.data.length
+
+      offset = offset + 1000;
+
+    }
 
     console.log(`Tally of buy txns on the collection: ${wallet_tally}`);
+    console.log(wallet_tally)
 
     return wallet_tally;
 
-  
   } catch (err) {
     console.log(err);
   }
@@ -304,8 +321,12 @@ const start = async (collection_symbol) => {
   
     solTransferWallets.forEach(transfer_recipient => {
       for (const wallet in walletTally) {
+        console.log(wallet);
         if(wallet == transfer_recipient && !(wallet in matches)) {
-          matches[wallet] = true;
+          matches[wallet] = {
+            txns: walletTally[wallet].txns,
+            vol: walletTally[wallet].vol
+          };
         }
       }
     })
@@ -336,7 +357,7 @@ const start2 = async (collection_symbol) => {
     console.log(err)
   }
 }
-
+/*
 const start3 = async (collection_symbol) => {
   var matches = {};
   var solTransferWallets = [];
@@ -381,6 +402,7 @@ const start3 = async (collection_symbol) => {
   return matches;
 
 }
+*/
 
 const startAndSendResultToS3 = async (collection_symbol, uid) => {
 
@@ -432,5 +454,4 @@ const retrieveFromS3 = async (fileName) => {
 // retrieveFromS3("sakura_cats-blahfuck")
 
 
-
-
+// getCollectionBuyTxns("doodlegenics")
