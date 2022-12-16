@@ -167,7 +167,6 @@ const getCreatorWallets = async (mintAddress) => {
   const nft = await metaplex.nfts().findByMint({ mintAddress });
 
   for (let i = 0; i < nft.creators.length; i++) {
-    console.log()
     creatorWallets.push(nft.creators[i].address.toBase58())
   }
   console.log(creatorWallets)
@@ -321,7 +320,6 @@ const start = async (collection_symbol) => {
   
     solTransferWallets.forEach(transfer_recipient => {
       for (const wallet in walletTally) {
-        console.log(wallet);
         if(wallet == transfer_recipient && !(wallet in matches)) {
           matches[wallet] = {
             txns: walletTally[wallet].txns,
