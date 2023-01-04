@@ -66,13 +66,15 @@ app.get('/results/:filePath', async (req, res) => {
 
 });
 
-app.get('/start2/:collectionSymbol', async (req, res) => {
+app.get('/start2/:collectionSymbol/:timeFrame', async (req, res) => {
   try {
     console.log(req.params)
+    console.log("Time frame: ", req.params.timeFrame)
+    console.log("Collection symbol: ", req.params.collectionSymbol)
 
     var body = {}
 
-    body.washTradingWallets = await start2(req.params.collectionSymbol);
+    body.washTradingWallets = await start2(req.params.collectionSymbol, req.params.timeFrame);
 
     console.log("body", body)
     res.send(body);
@@ -82,14 +84,14 @@ app.get('/start2/:collectionSymbol', async (req, res) => {
   }
 });
 
-app.get('/start3/:collectionSymbol', async (req, res) => {
+app.get('/start3/:collectionSymbol/:timeFrame', async (req, res) => {
   try {
     console.log(req.params)
 
     var body = {}
     var uid = uuidv4();
 
-    startAndSendResultToS3(req.params.collectionSymbol, uid);
+    startAndSendResultToS3(req.params.collectionSymbol, req.params.timeFrame, uid);
 
     res.location(`/${req.params.collectionSymbol}-${uid}.json`)
     res.status(202).send({ location: `/${req.params.collectionSymbol}-${uid}.json` });
@@ -112,7 +114,7 @@ app.get('/start3/:collectionSymbol', async (req, res) => {
 
 app.listen(PORT, () => console.log(`Example app is listening on port ${PORT}.`));
 
-const getCollectionBuyTxns = async (collection_symbol) => {
+const getCollectionBuyTxns = async (collection_symbol, beginTime) => {
   
   var wallet_tally = {}
   let offset = 0
@@ -130,16 +132,17 @@ const getCollectionBuyTxns = async (collection_symbol) => {
       if(response.data.length == 0) { break; }
 
       response.data.forEach(element => {
-        if (element.type === "buyNow" && element.buyer in wallet_tally) {
-          wallet_tally[element.buyer].txns++;
-          wallet_tally[element.buyer].vol = wallet_tally[element.buyer].vol + element.price
-        } else if (element.type === "buyNow" && !(element.buyer in wallet_tally)) {
-          
-          wallet_tally[element.buyer] = {
-            txns: 1,
-            vol: element.price
-          }
-        } 
+        if (element.type === "buyNow" && element.blockTime >= beginTime) {
+          if (element.buyer in wallet_tally) {
+            wallet_tally[element.buyer].txns++;
+            wallet_tally[element.buyer].vol = wallet_tally[element.buyer].vol + element.price
+          } else if (!(element.buyer in wallet_tally)) {
+            wallet_tally[element.buyer] = {
+              txns: 1,
+              vol: element.price
+            }
+          } 
+        }
       });
 
       console.log(response.data[0])
@@ -216,8 +219,8 @@ const getCreatorTransfers = async (royalty_wallet) => {
   }
 }
 
-const getWallet2WalletTxs = async (collection_symbol) => {
-  
+const getWallet2WalletTxs = async (collection_symbol, beginTime) => {  
+
   var wash_trading_wallets = {};
   var buyNow_txns = [];
   let offset = 0
@@ -226,14 +229,19 @@ const getWallet2WalletTxs = async (collection_symbol) => {
 
   try {
 
+    console.log("Begin time:", beginTime)
+
     while(data_length == limit && offset != 16000) {
       const response = await axios({
         method: "get",
         url: `https://api-mainnet.magiceden.dev/v2/collections/${collection_symbol}/activities?offset=${offset}&limit=${limit}`
       });
 
+      console.log(beginTime)
+      console.log(response.data[0].blockTime)
+      console.log(response.data[0].blockTime - beginTime)
       response.data.forEach(element => {
-        if(element.type === "buyNow") {
+        if(element.type === "buyNow" && element.blockTime >= beginTime) {
           buyNow_txns.push(element);
         }
       })
@@ -282,7 +290,7 @@ const getWallet2WalletTxs = async (collection_symbol) => {
   }
 };
 
-const start = async (collection_symbol) => {
+const start = async (collection_symbol, beginTime) => {
   try {
     var matches = {};
     var solTransferWallets = [];
@@ -313,7 +321,7 @@ const start = async (collection_symbol) => {
   
     console.log("sol wallet transfers, index 0: ", solTransferWallets[0]);
   
-    var walletTally = await getCollectionBuyTxns(collection_symbol);
+    var walletTally = await getCollectionBuyTxns(collection_symbol, beginTime);
   
     console.log("wallet tally :", walletTally);
   
@@ -345,10 +353,37 @@ const start = async (collection_symbol) => {
 
 //input collection name --> it finds the creator wallets --> searches for transfers
 
-const start2 = async (collection_symbol) => {
+const start2 = async (collection_symbol, timeFrame) => {
+
+  const timeNow = Date.now() / 1000
+  const minus1hrTime = timeNow - 3600
+  const minus6hrsTime = timeNow - 21600
+  const minus24hrsTime = timeNow - 86400
+  const allTime = 0;
+  let beginTime;
+
   try {
-  console.log("yee")
-  const stuff = await getWallet2WalletTxs(collection_symbol)
+  console.log("Time now: ", timeNow)
+  console.log("Time frame: ", timeFrame);
+  switch(timeFrame) {
+    case "1hr":
+      beginTime = minus1hrTime
+      break;
+    case "6hr":
+      beginTime = minus6hrsTime
+      break;
+    case "24hr":
+      beginTime = minus24hrsTime
+      break;
+    case "all_time":
+      beginTime = 0;
+      break;
+  }  
+
+  console.log("Begin time: ", beginTime);
+
+
+  const stuff = await getWallet2WalletTxs(collection_symbol, beginTime)
 
   return stuff;
   } catch(err) {
@@ -402,9 +437,31 @@ const start3 = async (collection_symbol) => {
 }
 */
 
-const startAndSendResultToS3 = async (collection_symbol, uid) => {
+const startAndSendResultToS3 = async (collection_symbol, timeFrame, uid) => {
 
-  var temp = await start(collection_symbol);
+  const timeNow = Date.now() / 1000
+  const minus1hrTime = timeNow - 3600
+  const minus6hrsTime = timeNow - 21600
+  const minus24hrsTime = timeNow - 86400
+  const allTime = 0;
+  let beginTime;
+
+  switch(timeFrame) {
+    case "1hr":
+      beginTime = minus1hrTime
+      break;
+    case "6hr":
+      beginTime = minus6hrsTime
+      break;
+    case "24hr":
+      beginTime = minus24hrsTime
+      break;
+    case "all_time":
+      beginTime = 0;
+      break;
+  }  
+
+  var temp = await start(collection_symbol, beginTime);
 
   var obj = temp;
 
