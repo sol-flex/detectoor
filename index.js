@@ -10,7 +10,36 @@ const metaplex = new Metaplex.Metaplex(connection);
 const PORT = process.env.PORT || 5000
 const Delay = require("http-delayed-response")
 const { v4: uuidv4 } = require('uuid');
+const bodyParser = require("body-parser");
+const {MongoClient, ServerApiVersion} = require('mongodb');
+const mongoose = require("mongoose");
 
+// MONGO DB
+const username = "thugraffes"
+const password = "fVLi29iGzwAk92XV"
+const cluster = "cluster0.pl9nm"
+const dbname = "calendooor";
+const mongoURI = `mongodb+srv://${username}:${password}@${cluster}.mongodb.net/${dbname}?retryWrites=true&w=majority`
+const client = new MongoClient(mongoURI);
+const database = client.db('calendooor');
+
+    /*
+    const reference_example = 
+    
+    {
+      year: 2023,
+      hoursOfDay: {
+        0: {
+          ricky: {
+            start_time: 30
+          },
+          browny: {},
+          marko: { end_time: 45 }
+        },
+        1: {}
+      }
+    }
+*/
 
 var AWS = require("aws-sdk");
 AWS.config.update({region: 'us-west-2'});
@@ -20,9 +49,10 @@ s3 = new AWS.S3({apiVersion: '2006-03-01'});
 
 const app = express();
 
-app.use(cors({
-    origin: '*'
-}));
+app.use(cors());
+
+app.use(bodyParser.json())
+app.use(bodyParser.urlencoded({extended: false}))
 
 
 app.get('/', (req, res) => {
@@ -109,6 +139,134 @@ app.get('/start3/:collectionSymbol/:timeFrame', async (req, res) => {
 */
   } catch(err) {
     res.status(500).json({ message: "Error in invocation of API: /start2" })
+  }
+});
+
+app.get('/calendooor/:JSdateOnFirstDayOfWeek', async (req, res) => {
+  try {
+    console.log("got a request")
+    console.log(req.params.JSdateOnFirstDayOfWeek)
+
+    const JSdateOnSunday = parseInt(req.params.JSdateOnFirstDayOfWeek)
+    console.log("JSdateOnSunday", JSdateOnSunday)
+    const dateOnSunday = new Date(JSdateOnSunday)
+    const milisecondsIn24Hours = 86400000;
+
+    const daysOfWeek = []
+
+    // Establish and verify connection
+    await client.connect();
+    await client.db("admin").command({ ping: 1 });
+    console.log("Connected successfully to server");
+    const calendar = database.collection('calendar');
+
+    const scheduleObj = []
+
+
+    for(let i = 0; i < 7; i++) {
+      const JSdateOnWeekDay = JSdateOnSunday + (milisecondsIn24Hours * i)
+      console.log("JSdateOnWeekDay", JSdateOnWeekDay)
+      const dateOnWeekDay = new Date(JSdateOnWeekDay)
+      console.log("dateOnWeekDay", dateOnWeekDay)
+
+      const mongoQueryObj = {
+        year: dateOnWeekDay.getUTCFullYear(),
+        month: dateOnWeekDay.getUTCMonth(),
+        date: dateOnWeekDay.getUTCDate()
+      }
+      console.log(mongoQueryObj);
+
+      let calendarDoc = await calendar.findOne(mongoQueryObj)
+      console.log(calendarDoc)
+
+      if(calendarDoc === null) {
+        scheduleObj.push({})
+      } else {
+        scheduleObj.push(calendarDoc)
+      }
+
+    }
+
+    res.send(scheduleObj);
+
+  } catch(err) {
+    console.log(err)
+    res.status(500).json({ message: "Error in invocation of API: /calendooor" })
+  }
+});
+
+app.post('/calendooor/addtime', async (req, res) => {
+  try {
+    console.log(req.body)
+
+    // Establish and verify connection
+    await client.connect();
+    await client.db("admin").command({ ping: 1 });
+    console.log("Connected successfully to server");
+
+    const calendar = database.collection('calendar');
+
+    const start_time_hour = parseInt(req.body.start_time_hour)
+    const end_time_hour = parseInt(req.body.end_time_hour)
+    const start_time_minute = parseInt(req.body.start_time_minute)
+    const end_time_minute = parseInt(req.body.end_time_minute)
+    const applyChangesTo = req.body.applyChangesTo
+    const staff = req.body.staff
+    const toggledDays = req.body.toggledDays
+
+    console.log(req.body.toggledDays[0])
+    console.log(req.body.toggledDays[1])
+    console.log(req.body.toggledDays[req.body.toggledDays-1])
+
+    for(let i = 0; i < req.body.toggledDays.length; i++) {
+      console.log(req.body.toggledDays.length)
+      const year = req.body.toggledDays[i].year
+      const month = req.body.toggledDays[i].month
+      const date = req.body.toggledDays[i].date
+      
+
+      //find the document matching the year, month, date
+      let calendarDoc = await calendar.findOne({ year: year, month: month, date})
+
+      if(calendarDoc === null) {
+
+        calendarDoc = {
+          year : year,
+          month : month,
+          date : date,
+          hoursOfDay : {}
+        }
+      }
+
+      for(let i = 0; i < 24; i++) { if(!(i in calendarDoc.hoursOfDay)) { calendarDoc.hoursOfDay[i] = {} } }
+
+      if(req.body.action === "delete_button") {
+        for (const hour in calendarDoc.hoursOfDay) {
+          toggledDays[i].hoursOfDay.forEach(function(hourToAdd) {
+            delete calendarDoc.hoursOfDay[hourToAdd][staff]
+          })
+        }
+      } else if (req.body.action === "submit_button") {
+        for (const hour in calendarDoc.hoursOfDay) {
+          toggledDays[i].hoursOfDay.forEach(function(hourToAdd) {
+            calendarDoc.hoursOfDay[hourToAdd][staff] = {}
+          })
+        }
+      }
+
+      console.log(typeof calendarDoc)
+      console.log(calendarDoc);
+      const mongoResult = await calendar.replaceOne({ year: year, month: month, date: date }, calendarDoc, { upsert: true})
+      console.log(mongoResult);
+      console.log(`Modified ${mongoResult.modifiedCount} document(s)`);
+
+    }
+
+    res.send({ msg: "yesss"})
+
+  } catch(err) {
+    console.log(err)
+    res.status(500).json({ message: "Error in invocation of API: /calendooor/add_time" })
   }
 });
 
