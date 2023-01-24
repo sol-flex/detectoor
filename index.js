@@ -163,7 +163,7 @@ app.get('/calendooor/:JSdateOnFirstDayOfWeek', async (req, res) => {
     const scheduleObj = []
 
 
-    for(let i = 0; i < 7; i++) {
+    for(let i = -1; i < 8; i++) {
       const JSdateOnWeekDay = JSdateOnSunday + (milisecondsIn24Hours * i)
       console.log("JSdateOnWeekDay", JSdateOnWeekDay)
       const dateOnWeekDay = new Date(JSdateOnWeekDay)
@@ -186,6 +186,8 @@ app.get('/calendooor/:JSdateOnFirstDayOfWeek', async (req, res) => {
       }
 
     }
+
+    console.log(scheduleObj);
 
     res.send(scheduleObj);
 
