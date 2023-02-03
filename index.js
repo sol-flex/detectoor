@@ -13,6 +13,16 @@ const { v4: uuidv4 } = require('uuid');
 const bodyParser = require("body-parser");
 const {MongoClient, ServerApiVersion} = require('mongodb');
 const mongoose = require("mongoose");
+const SPL = require("@solana/spl-token")
+const Anchor = require("@project-serum/anchor")
+
+// Scanooor 
+
+const SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID = new Solana.PublicKey(
+  'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
+);
+
+const ocpProgramId = new Solana.PublicKey("ocp4vWUzA2z2XMYJ3QhM9vWdyoyoQwAFJhRdVTbvo9E");
 
 // MONGO DB
 const username = "thugraffes"
@@ -54,6 +64,24 @@ app.use(cors());
 app.use(bodyParser.json())
 app.use(bodyParser.urlencoded({extended: false}))
 
+// scanooor
+
+app.get('/scanooor/:mintAddress', async (req, res) => {
+  try {
+      const mintData = await findByMint(new Solana.PublicKey(req.params.mintAddress))
+
+      console.log(mintData)
+
+      res.send(mintData)
+  } catch(err) {
+
+    console.log(err)
+    res.status(500).json({ message: "Error in invocation of API: /scanooor/:mintAddress" })
+  }
+
+});
+
+// scanooor end 
 
 app.get('/', (req, res) => {
   try {
@@ -188,6 +216,8 @@ app.get('/calendooor/:JSdateOnFirstDayOfWeek', async (req, res) => {
     }
 
     console.log(scheduleObj);
+
+    
 
     res.send(scheduleObj);
 
@@ -664,9 +694,165 @@ const retrieveFromS3 = async (fileName) => {
    });
 }
 
-// startAndSendResultToS3("sakura_cats")
+// Scanooor
 
-// retrieveFromS3("sakura_cats-blahfuck")
+async function findByMint(mintAddress) {
+
+  const data = {}
+
+  const nft = await metaplex.nfts().findByMint({ mintAddress });
+
+  const mintStatePk = findMintStatePk(mintAddress)
+  const mintStateAcc = await getMintStateAccountInfo(mintStatePk);
+
+  if(getOwnerWalletFromMint(mintAddress) != false) {
+    const ownerWalletAddress = await getOwnerWalletFromMint(mintAddress)
+    console.log("owner wallet: ", ownerWalletAddress)
+    const associatedTokenAccount = await findAssociatedTokenAddress(ownerWalletAddress, mintAddress)
+
+    console.log("ATA: ", associatedTokenAccount);
+
+    const associatedTokenAccountInfo = await getAccountInfo(associatedTokenAccount)
+
+    console.log("ATA info", associatedTokenAccountInfo);
+
+    const ataOwnerAddress = await getTokenLargestAccounts(mintAddress)
+
+    data.ownerWallet = ownerWalletAddress.toBase58()
+    data.ataAddress = associatedTokenAccount.toBase58()
+    data.ataDelegateAddress = associatedTokenAccountInfo.info.delegate === null | associatedTokenAccountInfo.info.delegate === undefined ? null : associatedTokenAccountInfo.info.delegate
+    data.ataDelegatedAmount = associatedTokenAccountInfo.info.delegate === null | associatedTokenAccountInfo.info.delegate === undefined ? null : associatedTokenAccountInfo.info.delegatedAmount.amount
+    data.ataState = associatedTokenAccountInfo.info.state
+    data.ataOwnerAddress = ataOwnerAddress;
+
+  }
+
+  data.nft = nft
+  data.type = nft.model
+  data.json = nft.json
+  data.updateAuthorityAddress =  nft.updateAuthorityAddress.toBase58()
+  data.collection = nft.collection === null ? null : nft.collection.address.toBase58()
+  data.collectionVerified = nft.collection === null ? null : nft.collection.verified
+  data.collectionDetails = nft.collectionDetails
+  data.mintAuthority = nft.mint.mintAuthorityAddress === null | nft.mint.mintAuthorityAddress === undefined ? null : nft.mint.mintAuthorityAddress.toBase58()
+  data.freezeAuthority =  nft.mint.freezeAuthorityAddress === null | nft.mint.freezeAuthorityAddress === undefined ? null : nft.mint.freezeAuthorityAddress.toBase58()
+  data.decimals = nft.mint.decimals
+  data.supply = await nft.mint.supply.basisPoints
+  data.sellerFee = nft.sellerFeeBasisPoints
+  data.creators = nft.creators
+  data.tokenStandard = nft.tokenStandard
+  data.metadataAddress = nft.metadataAddress.toBase58()
+  data.edition = nft.edition === undefined | nft.edition === null ? null : nft.edition.model
+  data.originalEdition = nft.edition === undefined | nft.edition === null ? null : nft.edition.isOriginal
+  data.editionAccountAddress = nft.edition === undefined | nft.edition === null ? null : nft.edition.address.toBase58()
+  data.editionAccountSupply = nft.edition === undefined | nft.edition === null ? null : await nft.edition.supply
+  data.editionAccountMaxSupply = nft.edition === undefined | nft.edition === null ? null : nft.edition.maxSupply
+  data.isOCP = mintStateAcc === null? false : true
+
+  console.log("data: ", data)
+
+  return data;
 
 
-// getCollectionBuyTxns("doodlegenics")
+}
+
+const findMintStatePk = (mint) => {
+  return  Solana.PublicKey.findProgramAddressSync(
+    [Anchor.utils.bytes.utf8.encode("mint_state"), mint.toBuffer()],
+    ocpProgramId
+  )[0];
+
+  return mintStatePk;
+};
+
+const getMintStateAccountInfo = async (mintStatePk) => {
+    const mintStateAcc =  await connection.getAccountInfo(mintStatePk);
+    console.log(mintStateAcc);
+    return mintStateAcc;
+}
+
+
+// const mintStatePk = findMintStatePk(mintAddress)
+// const mintStateAcc = getMintStateAccountInfo(mintStatePk);
+
+// findByMint(mintAddress);
+
+async function getAccountInfo(pubKey) {
+
+  const response = await axios({
+      method: 'post',
+      url: `https://api.mainnet-beta.solana.com`,
+      data: {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "getAccountInfo",
+          "params": [
+            `${pubKey.toString()}`,
+            {
+              "encoding": "jsonParsed"
+            }
+          ]
+        }
+    }) 
+
+    console.log(response.data.result.value.data.parsed);
+    //console.log("Token delegate: ", response.data.result.value.data.parsed.info.delegate)
+    //console.log("Delegated amount: ", response.data.result.value.data.parsed.info.delegatedAmount.amount)
+    // console.log("State of token account: ", response.data.result.value.data.parsed.info.state)
+
+    return response.data.result.value.data.parsed
+
+}
+
+
+
+// getAccountInfo(mintAddress);
+
+
+async function getOwnerWalletFromMint(mintAddress) {
+  const response = await axios({
+      method: 'get',
+      url: `https://api-mainnet.magiceden.dev/v2/tokens/${mintAddress.toString()}`,
+    })
+    console.log(Object.keys(response.data).length === 0);
+    return Object.keys(response.data).length === 0 ? false : new Solana.PublicKey(response.data.owner)
+
+}
+
+async function getTokenLargestAccounts(mintAddress) {
+
+  const connection = new Solana.Connection("https://burned-yolo-night.solana-mainnet.quiknode.pro/895b449661dccbdfbaf12ddef781ae2ac98f800b/");
+  const largestAccounts = await connection.getTokenLargestAccounts(mintAddress);
+  const largestAccountInfo = await connection.getParsedAccountInfo(largestAccounts.value[0].address);
+  console.log(largestAccountInfo.value.data.parsed.info.owner);
+
+  return new Solana.PublicKey(largestAccountInfo.value.data.parsed.info.owner);
+}
+
+async function findAssociatedTokenAddress(ownerWallet, tokenMint) {
+
+  const associatedTokenAccount = (await Solana.PublicKey.findProgramAddress(
+      [
+          ownerWallet.toBuffer(),
+          SPL.TOKEN_PROGRAM_ID.toBuffer(),
+          tokenMint.toBuffer(),
+      ],
+      SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID
+  ))[0];
+
+  console.log(associatedTokenAccount)
+
+  return associatedTokenAccount;
+
+}
+
+// getOwnerWalletFromMint(mintAddress);
+
+// findAssociatedTokenAddress(walletAddress, mintAddress)
+
+// getAccountInfo(genericAccountTesting);
+
+// findByMint(new Solana.PublicKey("7WQQUr8J4n2kc3LZULQBScZrTMujKBBJQLEyNMr2uTqA"));
+
+// getAccountInfo(new Solana.PublicKey("FjwKuHn91bYkB6f6YkPKnZWNwcaCFqEnoyyYdKP3C4Py"))
+
