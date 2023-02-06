@@ -3,9 +3,8 @@ const cors = require('cors');
 var axios = require("axios")
 var Metaplex = require("@metaplex-foundation/js");
 var Solana = require("@solana/web3.js")
-const Connection = Solana.Connection
 const clusterApiUrl = Solana.clusterApiUrl
-const connection = new Connection(clusterApiUrl("mainnet-beta"));
+const connection = new Solana.Connection(clusterApiUrl("mainnet-beta"));
 const metaplex = new Metaplex.Metaplex(connection);
 const PORT = process.env.PORT || 5000
 const Delay = require("http-delayed-response")
@@ -21,6 +20,7 @@ const Anchor = require("@project-serum/anchor")
 const SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID = new Solana.PublicKey(
   'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
 );
+const MINT_MANAGER_PROGRAM_ID = new Solana.PublicKey("mgr99QFMYByTqGPWmNqunV7vBLmWWXdSrHUfV8Jf3JM")
 
 const ocpProgramId = new Solana.PublicKey("ocp4vWUzA2z2XMYJ3QhM9vWdyoyoQwAFJhRdVTbvo9E");
 
@@ -698,61 +698,77 @@ const retrieveFromS3 = async (fileName) => {
 
 async function findByMint(mintAddress) {
 
-  const data = {}
+  try {
 
-  const nft = await metaplex.nfts().findByMint({ mintAddress });
+    const data = {}
 
-  const mintStatePk = findMintStatePk(mintAddress)
-  const mintStateAcc = await getMintStateAccountInfo(mintStatePk);
+    const nft = await metaplex.nfts().findByMint({ mintAddress });
 
-  if(getOwnerWalletFromMint(mintAddress) != false) {
-    const ownerWalletAddress = await getOwnerWalletFromMint(mintAddress)
-    console.log("owner wallet: ", ownerWalletAddress)
-    const associatedTokenAccount = await findAssociatedTokenAddress(ownerWalletAddress, mintAddress)
+    console.log("NFT RIGHT HERE: ", nft);
+  
+    // OCP Mint State Account
+    const mintStatePk = findMintStatePk(mintAddress)
+    const mintStateAcc = await getMintStateAccountInfo(mintStatePk);
+  
+    // Cardinal Labs Mint Manager Account 
+    const mintManagerPk = await findCardinalLabsMintManagerPDA(mintAddress)
+    const mintManagerAcc = await getMintManagerAccountInfo(mintManagerPk)
+  
+    if(getOwnerWalletFromMint(mintAddress) != false) {
+      const ownerWalletAddress = await getOwnerWalletFromMint(mintAddress)
+      console.log("owner wallet: ", ownerWalletAddress)
 
-    console.log("ATA: ", associatedTokenAccount);
+      const ataOwnerAddress = await getTokenLargestAccounts(mintAddress)
 
-    const associatedTokenAccountInfo = await getAccountInfo(associatedTokenAccount)
+      const associatedTokenAccount = await findAssociatedTokenAddress(nft.tokenStandard === 4 ? ataOwnerAddress : ownerWalletAddress, mintAddress)
+  
+      console.log("ATA: ", associatedTokenAccount);
+  
+      const associatedTokenAccountInfo = await getAccountInfo(associatedTokenAccount)
+  
+      console.log("ATA info", associatedTokenAccountInfo);
+    
+      data.ownerWallet = ownerWalletAddress.toBase58()
+      data.ataAddress = associatedTokenAccount.toBase58()
+      data.ataDelegateAddress = associatedTokenAccountInfo.data.parsed.info.delegate === null | associatedTokenAccountInfo.data.parsed.info.delegate === undefined ? null : associatedTokenAccountInfo.data.parsed.info.delegate
+      data.ataDelegatedAmount = associatedTokenAccountInfo.data.parsed.info.delegate === null | associatedTokenAccountInfo.data.parsed.info.delegate === undefined ? null : associatedTokenAccountInfo.data.parsed.info.delegatedAmount.amount
+      data.ataState = associatedTokenAccountInfo.data.parsed.info.state
+      data.ataOwnerAddress = ataOwnerAddress;
+  
+    }
+  
+    data.nft = nft
+    data.type = nft.model
+    data.json = nft.json
+    data.updateAuthorityAddress =  nft.updateAuthorityAddress.toBase58()
+    data.collection = nft.collection === null ? null : nft.collection.address.toBase58()
+    data.collectionVerified = nft.collection === null ? null : nft.collection.verified
+    data.collectionDetails = nft.collectionDetails
+    data.mintAuthority = nft.mint.mintAuthorityAddress === null | nft.mint.mintAuthorityAddress === undefined ? null : nft.mint.mintAuthorityAddress.toBase58()
+    data.freezeAuthority =  nft.mint.freezeAuthorityAddress === null | nft.mint.freezeAuthorityAddress === undefined ? null : nft.mint.freezeAuthorityAddress.toBase58()
+    data.decimals = nft.mint.decimals
+    data.supply = await nft.mint.supply.basisPoints
+    data.sellerFee = nft.sellerFeeBasisPoints
+    data.creators = nft.creators
+    data.tokenStandard = nft.tokenStandard
+    data.metadataAddress = nft.metadataAddress.toBase58()
+    data.edition = nft.edition === undefined | nft.edition === null ? null : nft.edition.model
+    data.originalEdition = nft.edition === undefined | nft.edition === null ? null : nft.edition.isOriginal
+    data.editionAccountAddress = nft.edition === undefined | nft.edition === null ? null : nft.edition.address.toBase58()
+    data.editionAccountSupply = nft.edition === undefined | nft.edition === null ? null : await nft.edition.supply
+    data.editionAccountMaxSupply = nft.edition === undefined | nft.edition === null ? null : nft.edition.maxSupply
+    data.isOCP = mintStateAcc === null? false : true
+    data.isCardinal = mintManagerAcc === null ? false: true
+    data.isMIP1 = nft.programmableConfig === null | nft.programmableConfig === undefined ? false : true
 
-    console.log("ATA info", associatedTokenAccountInfo);
-
-    const ataOwnerAddress = await getTokenLargestAccounts(mintAddress)
-
-    data.ownerWallet = ownerWalletAddress.toBase58()
-    data.ataAddress = associatedTokenAccount.toBase58()
-    data.ataDelegateAddress = associatedTokenAccountInfo.info.delegate === null | associatedTokenAccountInfo.info.delegate === undefined ? null : associatedTokenAccountInfo.info.delegate
-    data.ataDelegatedAmount = associatedTokenAccountInfo.info.delegate === null | associatedTokenAccountInfo.info.delegate === undefined ? null : associatedTokenAccountInfo.info.delegatedAmount.amount
-    data.ataState = associatedTokenAccountInfo.info.state
-    data.ataOwnerAddress = ataOwnerAddress;
-
+    console.log(data)
+  
+    return data;
+  
+  
+  } catch(err) {
+    console.log(err)
   }
-
-  data.nft = nft
-  data.type = nft.model
-  data.json = nft.json
-  data.updateAuthorityAddress =  nft.updateAuthorityAddress.toBase58()
-  data.collection = nft.collection === null ? null : nft.collection.address.toBase58()
-  data.collectionVerified = nft.collection === null ? null : nft.collection.verified
-  data.collectionDetails = nft.collectionDetails
-  data.mintAuthority = nft.mint.mintAuthorityAddress === null | nft.mint.mintAuthorityAddress === undefined ? null : nft.mint.mintAuthorityAddress.toBase58()
-  data.freezeAuthority =  nft.mint.freezeAuthorityAddress === null | nft.mint.freezeAuthorityAddress === undefined ? null : nft.mint.freezeAuthorityAddress.toBase58()
-  data.decimals = nft.mint.decimals
-  data.supply = await nft.mint.supply.basisPoints
-  data.sellerFee = nft.sellerFeeBasisPoints
-  data.creators = nft.creators
-  data.tokenStandard = nft.tokenStandard
-  data.metadataAddress = nft.metadataAddress.toBase58()
-  data.edition = nft.edition === undefined | nft.edition === null ? null : nft.edition.model
-  data.originalEdition = nft.edition === undefined | nft.edition === null ? null : nft.edition.isOriginal
-  data.editionAccountAddress = nft.edition === undefined | nft.edition === null ? null : nft.edition.address.toBase58()
-  data.editionAccountSupply = nft.edition === undefined | nft.edition === null ? null : await nft.edition.supply
-  data.editionAccountMaxSupply = nft.edition === undefined | nft.edition === null ? null : nft.edition.maxSupply
-  data.isOCP = mintStateAcc === null? false : true
-
-  console.log("data: ", data)
-
-  return data;
-
 
 }
 
@@ -769,6 +785,12 @@ const getMintStateAccountInfo = async (mintStatePk) => {
     const mintStateAcc =  await connection.getAccountInfo(mintStatePk);
     console.log(mintStateAcc);
     return mintStateAcc;
+}
+
+const getMintManagerAccountInfo = async (mintManagerPk) => {
+  const mintManagerAcc =  await connection.getAccountInfo(mintManagerPk);
+  console.log(mintManagerAcc);
+  return mintManagerAcc;
 }
 
 
@@ -795,18 +817,18 @@ async function getAccountInfo(pubKey) {
         }
     }) 
 
-    console.log(response.data.result.value.data.parsed);
+    console.log(response.data.result.value);
     //console.log("Token delegate: ", response.data.result.value.data.parsed.info.delegate)
     //console.log("Delegated amount: ", response.data.result.value.data.parsed.info.delegatedAmount.amount)
     // console.log("State of token account: ", response.data.result.value.data.parsed.info.state)
 
-    return response.data.result.value.data.parsed
+    return response.data.result.value
 
 }
 
 
 
-// getAccountInfo(mintAddress);
+// getAccountInfo(new Solana.PublicKey("JEBA7S7oxHesV1dRLh5d864qY3CSW8qUhWKGsfxJCNgt"));
 
 
 async function getOwnerWalletFromMint(mintAddress) {
@@ -846,13 +868,29 @@ async function findAssociatedTokenAddress(ownerWallet, tokenMint) {
 
 }
 
+async function findCardinalLabsMintManagerPDA(tokenMint) {
+
+  const mintManagerPDA = (await Solana.PublicKey.findProgramAddress(
+      [
+          Buffer.from('mint-manager'),
+          tokenMint.toBuffer(),
+      ],
+      MINT_MANAGER_PROGRAM_ID
+  ))[0];
+
+  console.log(mintManagerPDA)
+
+  return mintManagerPDA;
+
+}
+
 // getOwnerWalletFromMint(mintAddress);
 
 // findAssociatedTokenAddress(walletAddress, mintAddress)
 
 // getAccountInfo(genericAccountTesting);
 
-// findByMint(new Solana.PublicKey("7WQQUr8J4n2kc3LZULQBScZrTMujKBBJQLEyNMr2uTqA"));
+findByMint(new Solana.PublicKey("Fu1EVcwZA9vWzbb6hh7g5c5ybhnF9v4q9ywMBSHcxS5n"));
 
 // getAccountInfo(new Solana.PublicKey("FjwKuHn91bYkB6f6YkPKnZWNwcaCFqEnoyyYdKP3C4Py"))
 
