@@ -890,7 +890,7 @@ async function findCardinalLabsMintManagerPDA(tokenMint) {
 
 // getAccountInfo(genericAccountTesting);
 
-findByMint(new Solana.PublicKey("Fu1EVcwZA9vWzbb6hh7g5c5ybhnF9v4q9ywMBSHcxS5n"));
+// findByMint(new Solana.PublicKey("Fu1EVcwZA9vWzbb6hh7g5c5ybhnF9v4q9ywMBSHcxS5n"));
 
 // getAccountInfo(new Solana.PublicKey("FjwKuHn91bYkB6f6YkPKnZWNwcaCFqEnoyyYdKP3C4Py"))
 
