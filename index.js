@@ -111,7 +111,7 @@ app.get('/results/:filePath', async (req, res) => {
           res.status(404).send({ msg: "Something went wrong with accessing s3"})
          }
        } 
-       else {
+       else { 
          var jsonData = JSON.parse(data.Body)
          console.log(jsonData);
          res.send(jsonData);
@@ -701,6 +701,8 @@ async function findByMint(mintAddress) {
   try {
 
     const data = {}
+
+    console.log(`calling findByMint with ${mintAddress}`)
 
     const nft = await metaplex.nfts().findByMint({ mintAddress });
 
