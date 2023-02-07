@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 var axios = require("axios")
-var Metaplex = require("@metaplex-foundation/js");
+// var Metaplex = require("@metaplex-foundation/js");
 var Solana = require("@solana/web3.js")
 const clusterApiUrl = Solana.clusterApiUrl
 const connection = new Solana.Connection(clusterApiUrl("mainnet-beta"));
