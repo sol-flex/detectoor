@@ -3,9 +3,10 @@ const cors = require('cors');
 var axios = require("axios")
 var Metaplex = require("@metaplex-foundation/js");
 var Solana = require("@solana/web3.js")
+const Connection = Solana.Connection
 const clusterApiUrl = Solana.clusterApiUrl
-const connection = new Solana.Connection(clusterApiUrl("mainnet-beta"));
-const metaplex = new Metaplex.Metaplex(connection); 
+const connection = new Connection(clusterApiUrl("mainnet-beta"));
+const metaplex = new Metaplex.Metaplex(connection);
 const PORT = process.env.PORT || 5000
 const Delay = require("http-delayed-response")
 const { v4: uuidv4 } = require('uuid');
@@ -20,6 +21,7 @@ const Anchor = require("@project-serum/anchor")
 const SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID = new Solana.PublicKey(
   'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
 );
+
 const MINT_MANAGER_PROGRAM_ID = new Solana.PublicKey("mgr99QFMYByTqGPWmNqunV7vBLmWWXdSrHUfV8Jf3JM")
 
 const ocpProgramId = new Solana.PublicKey("ocp4vWUzA2z2XMYJ3QhM9vWdyoyoQwAFJhRdVTbvo9E");
@@ -111,7 +113,7 @@ app.get('/results/:filePath', async (req, res) => {
           res.status(404).send({ msg: "Something went wrong with accessing s3"})
          }
        } 
-       else { 
+       else {
          var jsonData = JSON.parse(data.Body)
          console.log(jsonData);
          res.send(jsonData);
@@ -702,8 +704,6 @@ async function findByMint(mintAddress) {
 
     const data = {}
 
-    console.log(`calling findByMint with ${mintAddress}`)
-
     const nft = await metaplex.nfts().findByMint({ mintAddress });
 
     console.log("NFT RIGHT HERE: ", nft);
@@ -796,6 +796,7 @@ const getMintManagerAccountInfo = async (mintManagerPk) => {
 }
 
 
+
 // const mintStatePk = findMintStatePk(mintAddress)
 // const mintStateAcc = getMintStateAccountInfo(mintStatePk);
 
@@ -830,7 +831,7 @@ async function getAccountInfo(pubKey) {
 
 
 
-// getAccountInfo(new Solana.PublicKey("JEBA7S7oxHesV1dRLh5d864qY3CSW8qUhWKGsfxJCNgt"));
+// getAccountInfo(mintAddress);
 
 
 async function getOwnerWalletFromMint(mintAddress) {
@@ -892,7 +893,7 @@ async function findCardinalLabsMintManagerPDA(tokenMint) {
 
 // getAccountInfo(genericAccountTesting);
 
-// findByMint(new Solana.PublicKey("Fu1EVcwZA9vWzbb6hh7g5c5ybhnF9v4q9ywMBSHcxS5n"));
+// findByMint(new Solana.PublicKey("7WQQUr8J4n2kc3LZULQBScZrTMujKBBJQLEyNMr2uTqA"));
 
 // getAccountInfo(new Solana.PublicKey("FjwKuHn91bYkB6f6YkPKnZWNwcaCFqEnoyyYdKP3C4Py"))
 
