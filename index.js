@@ -5,7 +5,7 @@ var Metaplex = require("@metaplex-foundation/js");
 var Solana = require("@solana/web3.js")
 const clusterApiUrl = Solana.clusterApiUrl
 const connection = new Solana.Connection(clusterApiUrl("mainnet-beta"));
-const metaplex = new Metaplex.Metaplex(connection);
+// const metaplex = new Metaplex.Metaplex(connection);  // "@metaplex-foundation/js": "^0.18.0"
 const PORT = process.env.PORT || 5000
 const Delay = require("http-delayed-response")
 const { v4: uuidv4 } = require('uuid');
@@ -357,7 +357,7 @@ const getCreatorWallets = async (mintAddress) => {
   let creatorWallets = []
   mintAddress = new Solana.PublicKey(mintAddress);
 
-  const nft = await metaplex.nfts().findByMint({ mintAddress });
+  const nft = "" // await metaplex.nfts().findByMint({ mintAddress });
 
   for (let i = 0; i < nft.creators.length; i++) {
     creatorWallets.push(nft.creators[i].address.toBase58())
@@ -704,7 +704,7 @@ async function findByMint(mintAddress) {
 
     console.log(`calling findByMint with ${mintAddress}`)
 
-    const nft = await metaplex.nfts().findByMint({ mintAddress });
+    const nft = "" // await metaplex.nfts().findByMint({ mintAddress });
 
     console.log("NFT RIGHT HERE: ", nft);
   
