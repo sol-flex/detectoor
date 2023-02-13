@@ -15,6 +15,9 @@ const {MongoClient, ServerApiVersion} = require('mongodb');
 const mongoose = require("mongoose");
 const SPL = require("@solana/spl-token")
 const Anchor = require("@project-serum/anchor")
+const msgpack = require('@msgpack/msgpack')
+const MIP1 = require("@metaplex-foundation/mpl-token-auth-rules")
+
 
 // Scanooor 
 
@@ -54,6 +57,7 @@ const database = client.db('calendooor');
 */
 
 var AWS = require("aws-sdk");
+const { decode } = require('@project-serum/anchor/dist/cjs/utils/bytes/hex');
 AWS.config.update({region: 'us-west-2'});
 
 s3 = new AWS.S3({apiVersion: '2006-03-01'});
@@ -715,6 +719,8 @@ async function findByMint(mintAddress) {
     // Cardinal Labs Mint Manager Account 
     const mintManagerPk = await findCardinalLabsMintManagerPDA(mintAddress)
     const mintManagerAcc = await getMintManagerAccountInfo(mintManagerPk)
+
+    const txns = await getTransactions(mintAddress, 100)
   
     if(getOwnerWalletFromMint(mintAddress) != false) {
       const ownerWalletAddress = await getOwnerWalletFromMint(mintAddress)
@@ -762,6 +768,8 @@ async function findByMint(mintAddress) {
     data.isOCP = mintStateAcc === null? false : true
     data.isCardinal = mintManagerAcc === null ? false: true
     data.isMIP1 = nft.programmableConfig === null | nft.programmableConfig === undefined ? false : true
+    data.txns = txns;
+    data.ruleSetDecoded = nft.programmableConfig === null | nft.programmableConfig === undefined ? null : await decodeRulesetData(nft.programmableConfig?.ruleSet)
 
     console.log(data)
   
@@ -887,13 +895,33 @@ async function findCardinalLabsMintManagerPDA(tokenMint) {
 
 }
 
+async function getTransactions(mintAddress, numTx) {
+
+  let transactionList = await connection.getSignaturesForAddress(mintAddress, {limit:numTx});
+  console.log(transactionList)
+  return transactionList;
+}
+
+async function decodeRulesetData(pubKey) {
+  console.log("public key: ", pubKey);
+  const accountInfo = await getAccountInfo(pubKey)
+  console.log("Accound info: ", accountInfo.data.result)
+  const data = Buffer.from(accountInfo?.data[0], "base64")
+  console.log(data);
+  const latestRuleSet = MIP1.getLatestRuleSet(data)
+  console.log(latestRuleSet)
+  return JSON.parse(latestRuleSet);
+}
+
 // getOwnerWalletFromMint(mintAddress);
 
-// findAssociatedTokenAddress(walletAddress, mintAddress)
+// findAssociatedTokenAddress(new Solana.PublicKey("D7ztc4gg2EkisT8YDbpZFWQhrwv2LMzaVXCVmU3KRfE"), new Solana.PublicKey("23YRWgewbAWtLEfAEVEC4GP7K24MLg1M5T1TBdo58SCn"))
 
 // getAccountInfo(genericAccountTesting);
 
-// findByMint(new Solana.PublicKey("7WQQUr8J4n2kc3LZULQBScZrTMujKBBJQLEyNMr2uTqA"));
+// findByMint(new Solana.PublicKey("23YRWgewbAWtLEfAEVEC4GP7K24MLg1M5T1TBdo58SCn"));
 
 // getAccountInfo(new Solana.PublicKey("FjwKuHn91bYkB6f6YkPKnZWNwcaCFqEnoyyYdKP3C4Py"))
+
+// decodeRulesetData(new Solana.PublicKey("AZ2HiSsD7G1gEt9stCV2ZdJprsLUKMTacwkj67YjG52"))
 
